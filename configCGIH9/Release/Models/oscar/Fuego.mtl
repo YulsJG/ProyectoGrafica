@@ -1,0 +1,12 @@
+# Blender 4.5.3 LTS MTL File: 'casa.blend'
+# www.blender.org
+
+newmtl a55f8e35b44_create_a_flame_blue_Material_0
+Ns 0.060000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Kd 2a55f8e35b44_create_a_flame_blue_texture_kd.jpg
