@@ -81,7 +81,7 @@ int main()
     Shader lightingShader("Shader/modelLoading.vs", "Shader/modelLoading.frag");
 
     // Modelo
-    Model modeloFI((char*)"Models/explanadafi.obj");
+    Model modeloFI((char*)"Models/Explanadafi/explanadafi.obj");
 
     //// PROYECCIÓN CORREGIDA
     //glm::mat4 projection = glm::perspective(
@@ -195,20 +195,6 @@ int main()
 
         modeloFI.Draw(lightingShader);
 
-
-        //Draw skybox last
-        //glDepthFunc(GL_LEQUAL);  // Change depth function so depth test passes when values are equal to depth buffer's content
-        //skyboxShader.Use();
-        //view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // Remove any translation component of the view matrix
-        //glUniformMatrix4fv(glGetUniformLocation(skyboxShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
-        //glUniformMatrix4fv(glGetUniformLocation(skyboxShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        // skybox cube
-        //glBindVertexArray(skyboxVAO);
-        //glActiveTexture(GL_TEXTURE1);
-        //glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-        //glDrawArrays(GL_TRIANGLES, 0, 36);
-        //glBindVertexArray(0);
-        //glDepthFunc(GL_LESS); // Set depth function back to default
 
         glfwSwapBuffers(window);
     }
