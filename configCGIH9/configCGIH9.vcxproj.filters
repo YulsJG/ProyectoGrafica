@@ -38,14 +38,14 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Camera.h">
-      <Filter>Archivos de encabezado</Filter>
-    </ClInclude>
-    <ClInclude Include="Model.h">
-      <Filter>Archivos de encabezado</Filter>
+    <ClInclude Include="Mesh.h">
+      <Filter>Archivos de origen</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
-      <Filter>Archivos de encabezado</Filter>
+      <Filter>Archivos de origen</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>Archivos de origen</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

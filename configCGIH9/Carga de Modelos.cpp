@@ -32,7 +32,7 @@ void MouseCallback(GLFWwindow* window, double xPos, double yPos);
 void DoMovement();
 
 // Camera (MEJOR POSICIÓN)
-Camera camera(glm::vec3(0.0f, 5.0f, 20.0f));
+Camera camera(glm::vec3(0.0f, 10.0f, 50.0f));
 
 bool keys[1024];
 GLfloat lastX = 400, lastY = 300;
@@ -51,7 +51,7 @@ int main()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Carga de modelos y camara sintetica", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Explanada FI", nullptr, nullptr);
 
     if (nullptr == window)
     {
@@ -77,17 +77,25 @@ int main()
     glEnable(GL_DEPTH_TEST);
 
     // Shader
-    Shader shader("Shader/modelLoading.vs", "Shader/modelLoading.frag");
+    //Shader shader("Shader/modelLoading.vs", "Shader/modelLoading.frag");
+    Shader lightingShader("Shader/modelLoading.vs", "Shader/modelLoading.frag");
 
     // Modelo
-    Model modeloFI((char*)"Models/ZonaFI.obj");
+    Model modeloFI((char*)"Models/explanadafi.obj");
 
-    // PROYECCIÓN CORREGIDA
+    //// PROYECCIÓN CORREGIDA
+    //glm::mat4 projection = glm::perspective(
+    //    glm::radians(camera.GetZoom()),
+    //    (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT,
+    //    0.1f,
+    //    2000.0f
+    //);
+    // Projection matrix
     glm::mat4 projection = glm::perspective(
-        glm::radians(camera.GetZoom()),
-        (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT,
+        camera.GetZoom(),
+        (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT,
         0.1f,
-        1000.0f
+        2000.0f
     );
 
     // Game loop
@@ -101,28 +109,106 @@ int main()
         DoMovement();
 
         // Fondo
-        glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        shader.Use();
+        //shader.Use();
+        lightingShader.Use();
+        glUniform1i(glGetUniformLocation(lightingShader.Program, "Material.difuse"), 0);
+        glUniform1i(glGetUniformLocation(lightingShader.Program, "Material.specular"), 1);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        // Camera position
+        GLint viewPosLoc = glGetUniformLocation(lightingShader.Program, "viewPos");
+        glUniform3f(
+            viewPosLoc,
+            camera.GetPosition().x,
+            camera.GetPosition().y,
+            camera.GetPosition().z
+        );
 
+        // ===============================
+        // �NICA LUZ: LUZ DIRECCIONAL TIPO SOL
+        // ===============================
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.direction"), -0.3f, -1.0f, -0.4f);
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.ambient"), 0.45f, 0.45f, 0.45f);
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.diffuse"), 0.75f, 0.75f, 0.75f);
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.specular"), 0.25f, 0.25f, 0.25f);
+
+        // Desactivar point lights si tu shader todav�a las tiene declaradas
+        for (int i = 0; i < 4; i++)
+        {
+            std::string base = "pointLights[" + std::to_string(i) + "]";
+
+            glUniform3f(glGetUniformLocation(lightingShader.Program, (base + ".position").c_str()), 0.0f, 0.0f, 0.0f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, (base + ".ambient").c_str()), 0.0f, 0.0f, 0.0f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, (base + ".diffuse").c_str()), 0.0f, 0.0f, 0.0f);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, (base + ".specular").c_str()), 0.0f, 0.0f, 0.0f);
+
+            glUniform1f(glGetUniformLocation(lightingShader.Program, (base + ".constant").c_str()), 1.0f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, (base + ".linear").c_str()), 0.0f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, (base + ".quadratic").c_str()), 0.0f);
+        }
+
+        // Desactivar spotlight si tu shader todav�a lo tiene declarado
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.position"), 0.0f, 0.0f, 0.0f);
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.direction"), 0.0f, 0.0f, -1.0f);
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.ambient"), 0.0f, 0.0f, 0.0f);
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.diffuse"), 0.0f, 0.0f, 0.0f);
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.specular"), 0.0f, 0.0f, 0.0f);
+        glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.constant"), 1.0f);
+        glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.linear"), 0.0f);
+        glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.quadratic"), 0.0f);
+        glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.cutOff"), glm::cos(glm::radians(12.0f)));
+        glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.outerCutOff"), glm::cos(glm::radians(18.0f)));
+
+        // Material
+        glUniform1f(glGetUniformLocation(lightingShader.Program, "material.shininess"), 5.0f);
+
+        //View Matrix
         glm::mat4 view = camera.GetViewMatrix();
 
-        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
+        // Uniform locations
+        GLint modelLoc = glGetUniformLocation(lightingShader.Program, "model");
+        GLint viewLoc = glGetUniformLocation(lightingShader.Program, "view");
+        GLint projLoc = glGetUniformLocation(lightingShader.Program, "projection");
+
+        // Send view and projection
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+      
+        glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
+
 
         // =========================
         // TRANSFORMACIÓN DEL MODELO
         // =========================
         glm::mat4 model = glm::mat4(1.0f);
 
-        // Escala
-        model = glm::scale(model, glm::vec3(1.0f));
-        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        // Escala    
+        model = glm::translate(model, glm::vec3(0.0f, -1.0f, -5.0f));
+        model = glm::scale(model, glm::vec3(0.2f, 0.2f, 0.2f));
 
-        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
 
-        modeloFI.Draw(shader);
+        modeloFI.Draw(lightingShader);
+
+
+        //Draw skybox last
+        //glDepthFunc(GL_LEQUAL);  // Change depth function so depth test passes when values are equal to depth buffer's content
+        //skyboxShader.Use();
+        //view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // Remove any translation component of the view matrix
+        //glUniformMatrix4fv(glGetUniformLocation(skyboxShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
+        //glUniformMatrix4fv(glGetUniformLocation(skyboxShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+        // skybox cube
+        //glBindVertexArray(skyboxVAO);
+        //glActiveTexture(GL_TEXTURE1);
+        //glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+        //glDrawArrays(GL_TRIANGLES, 0, 36);
+        //glBindVertexArray(0);
+        //glDepthFunc(GL_LESS); // Set depth function back to default
 
         glfwSwapBuffers(window);
     }

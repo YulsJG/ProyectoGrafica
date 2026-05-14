@@ -12,7 +12,6 @@ struct Material
 struct DirLight
 {
     vec3 direction;
-    
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
@@ -67,29 +66,35 @@ vec3 CalcSpotLight( SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir );
 
 void main( )
 {
-    // Properties
+    // Propiedades
     vec3 norm = normalize( Normal );
     vec3 viewDir = normalize( viewPos - FragPos );
     
-    // Directional lighting
+    // 1. Calculamos la iluminación total (Suma de todas las luces)
     vec3 result = CalcDirLight( dirLight, norm, viewDir );
     
-    // Point lights
     for ( int i = 0; i < NUMBER_OF_POINT_LIGHTS; i++ )
     {
         result += CalcPointLight( pointLights[i], norm, FragPos, viewDir );
     }
     
-    // Spot light
     result += CalcSpotLight( spotLight, norm, FragPos, viewDir );
  	
-    color = vec4( result,texture(material.diffuse, TexCoords).rgb );
-	  if(color.a < 0.1 && transparency==1)
+    // 2. Obtenemos el color base de la textura
+    vec4 texColor = texture(material.diffuse, TexCoords);
+    
+    // 3. Combinamos la iluminación con el color de la textura
+    // Multiplicamos el resultado de las luces por el RGB de la imagen
+    color = vec4(result, texColor.a);
+    //color = texture(material.diffuse, TexCoords);
+    //color = vec4(TexCoords, 0.0, 1.0);
+    
+    // 4. Lógica de transparencia para objetos específicos (como el perro o la ballena)
+    if(transparency == 1 && texColor.a < 0.1)
         discard;
-
 }
 
-// Calculates the color when using a directional light.
+// Calcula la luz direccional (Sol)
 vec3 CalcDirLight( DirLight light, vec3 normal, vec3 viewDir )
 {
     vec3 lightDir = normalize( -light.direction );
@@ -101,7 +106,7 @@ vec3 CalcDirLight( DirLight light, vec3 normal, vec3 viewDir )
     vec3 reflectDir = reflect( -lightDir, normal );
     float spec = pow( max( dot( viewDir, reflectDir ), 0.0 ), material.shininess );
     
-    // Combine results
+    // Combinar con textura
     vec3 ambient = light.ambient * vec3( texture( material.diffuse, TexCoords ) );
     vec3 diffuse = light.diffuse * diff * vec3( texture( material.diffuse, TexCoords ) );
     vec3 specular = light.specular * spec * vec3( texture( material.specular, TexCoords ) );
@@ -109,7 +114,7 @@ vec3 CalcDirLight( DirLight light, vec3 normal, vec3 viewDir )
     return ( ambient + diffuse + specular );
 }
 
-// Calculates the color when using a point light.
+// Calcula luces puntuales
 vec3 CalcPointLight( PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir )
 {
     vec3 lightDir = normalize( light.position - fragPos );
@@ -121,11 +126,11 @@ vec3 CalcPointLight( PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir )
     vec3 reflectDir = reflect( -lightDir, normal );
     float spec = pow( max( dot( viewDir, reflectDir ), 0.0 ), material.shininess );
     
-    // Attenuation
+    // Attenuation (Atenuación por distancia)
     float distance = length( light.position - fragPos );
     float attenuation = 1.0f / ( light.constant + light.linear * distance + light.quadratic * ( distance * distance ) );
     
-    // Combine results
+    // Combinar con textura
     vec3 ambient = light.ambient * vec3( texture( material.diffuse, TexCoords ) );
     vec3 diffuse = light.diffuse * diff * vec3( texture( material.diffuse, TexCoords ) );
     vec3 specular = light.specular * spec * vec3( texture( material.specular, TexCoords ) );
@@ -137,7 +142,7 @@ vec3 CalcPointLight( PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir )
     return ( ambient + diffuse + specular );
 }
 
-// Calculates the color when using a spot light.
+// Calcula luz de reflector (Linterna)
 vec3 CalcSpotLight( SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir )
 {
     vec3 lightDir = normalize( light.position - fragPos );
@@ -153,12 +158,12 @@ vec3 CalcSpotLight( SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir )
     float distance = length( light.position - fragPos );
     float attenuation = 1.0f / ( light.constant + light.linear * distance + light.quadratic * ( distance * distance ) );
     
-    // Spotlight intensity
+    // Intensidad del cono de luz
     float theta = dot( lightDir, normalize( -light.direction ) );
     float epsilon = light.cutOff - light.outerCutOff;
     float intensity = clamp( ( theta - light.outerCutOff ) / epsilon, 0.0, 1.0 );
     
-    // Combine results
+    // Combinar con textura
     vec3 ambient = light.ambient * vec3( texture( material.diffuse, TexCoords ) );
     vec3 diffuse = light.diffuse * diff * vec3( texture( material.diffuse, TexCoords ) );
     vec3 specular = light.specular * spec * vec3( texture( material.specular, TexCoords ) );

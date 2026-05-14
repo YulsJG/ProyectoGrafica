@@ -211,17 +211,29 @@ GLint TextureFromFile(const char *path, string directory)
 {
 	//Generate texture ID and load texture data
 	string filename = string(path);
-	filename = directory + '/' + filename;
+	if (!directory.empty() && directory.back() != '/' && directory.back() != '\\') {
+		filename = directory + '/' + filename;
+	}
+	else {
+		filename = directory + filename;
+	}
+	//filename = directory + '/' + filename;
 	GLuint textureID;
 	glGenTextures(1, &textureID);
 
 	int width, height;
 
-	unsigned char *image = SOIL_load_image(filename.c_str(), &width, &height, 0, SOIL_LOAD_RGB);
+	unsigned char *image = SOIL_load_image(filename.c_str(), &width, &height, 0, SOIL_LOAD_RGBA);
 
+	if (!image) {
+		std::cout << "FALLO CRÍTICO: No se encontró la textura en: " << filename << std::endl;
+		// SOIL_free_image_data(image); // No liberar si es nulo
+		return 0; // Detiene la ejecución para esta textura sin cerrar el programa
+	}
 	// Assign texture to ID
+	glGenTextures(1, &textureID);
 	glBindTexture(GL_TEXTURE_2D, textureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 	// Parameters
