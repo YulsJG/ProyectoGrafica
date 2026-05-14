@@ -80,8 +80,13 @@ int main()
     //Shader shader("Shader/modelLoading.vs", "Shader/modelLoading.frag");
     Shader lightingShader("Shader/modelLoading.vs", "Shader/modelLoading.frag");
 
-    // Modelo
+    // Modelo Escuela
     Model modeloFI((char*)"Models/Explanadafi/explanadafi.obj");
+
+    //Decorativos
+    Model moduloInfo((char*)"Models/ModuloInfo/Moduloinfo.obj");
+    Model Silla((char*)"Models/Silla/SillaPlegable.obj");
+    Model Estatua((char*)"Models/Estatua/Estatua.obj");
 
     //// PROYECCIÓN CORREGIDA
     //glm::mat4 projection = glm::perspective(
@@ -181,20 +186,51 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
-
-        // =========================
-        // TRANSFORMACIÓN DEL MODELO
-        // =========================
+		// Carga modelo FI
         glm::mat4 model = glm::mat4(1.0f);
-
         // Escala    
-        model = glm::translate(model, glm::vec3(0.0f, -1.0f, -5.0f));
+        //model = glm::translate(model, glm::vec3(0.0f, -1.0f, -5.0f));
+        model = glm::translate(model, glm::vec3(0.0f, -10.0f, 0.0f));
         model = glm::scale(model, glm::vec3(0.2f, 0.2f, 0.2f));
-
         glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-
         modeloFI.Draw(lightingShader);
 
+        // MÓDULO DE INFORMACIÓN 
+        model = glm::mat4(1.0f);
+        // 1. Posicionamiento 
+        model = glm::translate(model, glm::vec3(86.1851f, -22.0f, -73.5682f));
+        // 3. Escala 
+        model = glm::scale(model, glm::vec3(10.0f, 10.0f, 10.0f));
+        // Enviamos la matriz al shader y dibujamos
+        glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        moduloInfo.Draw(lightingShader);
+
+        //Silla
+        model = glm::mat4(1.0f);
+        // 1. Posicionamiento 
+        model = glm::translate(model, glm::vec3(88.4904f, -22.0f, -75.7144f));
+        // 3. Escala 
+        model = glm::scale(model, glm::vec3(20.0f, 20.0f, 20.0f));
+        // Enviamos la matriz al shader y dibujamos
+        glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        Silla.Draw(lightingShader);
+
+        //Estatua
+        model = glm::mat4(1.0f);
+        // 1. Posicionamiento 
+        model = glm::translate(model, glm::vec3(98.3464f, -22.0f, -109.688f));
+		//Rotación
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        // 3. Escala 
+        model = glm::scale(model, glm::vec3(10.0f, 10.0f, 10.0f));
+        // Enviamos la matriz al shader y dibujamos
+        glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        Estatua.Draw(lightingShader);
+
+        // Imprimir posición de la cámara en la consola
+        std::cout << "Posicion Camara: X: " << camera.GetPosition().x
+            << " | Y: " << camera.GetPosition().y
+            << " | Z: " << camera.GetPosition().z << std::endl;
 
         glfwSwapBuffers(window);
     }
