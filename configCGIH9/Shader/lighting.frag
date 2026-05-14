@@ -87,7 +87,7 @@ void main( )
     // Multiplicamos el resultado de las luces por el RGB de la imagen
     color = vec4(result, texColor.a);
     //color = texture(material.diffuse, TexCoords);
-    //color = vec4(TexCoords, 0.0, 1.0);
+
     
     // 4. Lógica de transparencia para objetos específicos (como el perro o la ballena)
     if(transparency == 1 && texColor.a < 0.1)
