@@ -41,7 +41,9 @@ bool firstMouse = true;
 
 //Aparecer stands
 bool mostrarStands = false;
-float escalaAnimacion = 0.0f;
+float escalaAnimacion = 0.0f; //Stands agrupaciones
+int estadoStands = 0;
+float escalaFeria = 0.0f;  //Stands Feria de Empleo 
 
 //Posiciones stands
 glm::vec3 posicionesStands[] = {
@@ -112,6 +114,15 @@ int main()
 	Model stand1((char*)"Models/Muebles/StandFeria.obj");
     Model Mesa((char*)"Models/Muebles/MesaG.obj");
     Model Mampara((char*)"Models/Muebles/Mampara.obj");
+
+    //Stands2
+    Model StandIzq((char*)"Models/Stands/StandIzq.obj");
+    Model StandDer((char*)"Models/Stands/StandDer.obj");
+    Model StandCentro((char*)"Models/Stands/StandCentro.obj");
+    Model StandCentro2((char*)"Models/Stands/StandCentro2.obj");
+    Model StandCentro3((char*)"Models/Stands/StandCentro3.obj");
+    Model StandCentro4((char*)"Models/Stands/StandCentro4.obj");
+
 
     //// PROYECCIÓN CORREGIDA
     //glm::mat4 projection = glm::perspective(
@@ -207,11 +218,11 @@ int main()
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-      
+
         glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
-		// Carga modelo FI
+        // Carga modelo FI
         glm::mat4 model = glm::mat4(1.0f);
         // Escala    
         //model = glm::translate(model, glm::vec3(0.0f, -1.0f, -5.0f));
@@ -244,27 +255,88 @@ int main()
         model = glm::mat4(1.0f);
         // 1. Posicionamiento 
         model = glm::translate(model, glm::vec3(98.3464f, -22.0f, -109.688f));
-		//Rotación
+        //Rotación
         model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         // 3. Escala 
         model = glm::scale(model, glm::vec3(10.0f, 10.0f, 10.0f));
         // Enviamos la matriz al shader y dibujamos
         glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
         Estatua.Draw(lightingShader);
+        
+		//Aparicion stands agrupaciones
+        if (estadoStands == 1 && escalaAnimacion < 1.0f) {
+            escalaAnimacion += 0.02f;
+        }
+        else if (estadoStands != 1 && escalaAnimacion > 0.0f) {
+            escalaAnimacion -= 0.02f; // Si el estado cambia a Feria (2), estos bajan a 0
+        }
 
-        //Aparicion stands
-        if (mostrarStands && escalaAnimacion < 1.0f) {
-            escalaAnimacion += 0.02f; // Velocidad de aparición
+        // Lógica de escala para la Feria de Empleo
+        if (estadoStands == 2 && escalaFeria < 1.0f) {
+            escalaFeria += 0.02f;
         }
-        else if (!mostrarStands && escalaAnimacion > 0.0f) {
-            escalaAnimacion -= 0.02f; // Desaparece suavemente
+        else if (estadoStands != 2 && escalaFeria > 0.0f) {
+            escalaFeria -= 0.02f;
         }
+
+		//Dibujar stands agrupaciones
         if (escalaAnimacion > 0.0f) {
             for (int i = 0; i < 3; i++) { // Ahora iteramos 3 veces
                 dibujarStandIndividual(lightingShader, Mampara, Mesa, Silla, posicionesStands[i], rotacionesStands[i]);
             }
         }
 
+		// Dibujar stands Feria de Empleo
+        if (escalaFeria > 0.0f) {
+            // --- STAND IZQUIERDO ---
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(-9.90163f, -30.0f, -37.5067f));
+            model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.2f * escalaFeria)); // Multiplicamos por la animación
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandIzq.Draw(lightingShader);
+            
+            // --- STAND DERECHO ---
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(130.0f, -30.0f, -37.5067f));
+            model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.3f * escalaFeria));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandDer.Draw(lightingShader);
+
+            // --- STAND CENTRO ---
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(52.8673f, -28.0f, 105.0f));
+            model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.1f * escalaFeria));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandCentro.Draw(lightingShader);
+                //Sillas
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(52.8673f, -26.0f, 100.0f));
+            model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.2f * escalaFeria));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandCentro2.Draw(lightingShader);
+                //Mueble enfrente
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(52.8673f, -28.0f, 100.0f));
+            model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.2f * escalaFeria));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandCentro3.Draw(lightingShader);
+                //Plantas
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(52.8673f, -28.0f, 90.0f));
+            model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.2f * escalaFeria));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandCentro4.Draw(lightingShader);
+
+
+        }
+
+        //121.545
         // Imprimir posición de la cámara en la consola
         std::cout << "Posicion Camara: X: " << camera.GetPosition().x
             << " | Y: " << camera.GetPosition().y
@@ -338,9 +410,14 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         else if (action == GLFW_RELEASE)
             keys[key] = false;
     }
-
-    if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
-        mostrarStands = !mostrarStands; // Cambia el estado
+	//Control de aparición de stands
+    if (key == GLFW_KEY_F && action == GLFW_PRESS) {
+        // Si presionas F, activas Feria (2) o apagas si ya estaba
+        estadoStands = (estadoStands == 2) ? 0 : 2;
+    }
+    if (key == GLFW_KEY_G && action == GLFW_PRESS) {
+        // Si presionas G, activas los otros (1) o apagas
+        estadoStands = (estadoStands == 1) ? 0 : 1;
     }
 }
 
