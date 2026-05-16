@@ -17,7 +17,7 @@
 
 #include "Mesh.h"
 #include  "Shader.h"
-
+#include "BoneInfo.h"
 using namespace std;
 
 GLint TextureFromFile(const char *path, string directory);
@@ -25,6 +25,16 @@ GLint TextureFromFile(const char *path, string directory);
 class Model
 {
 public:
+	// ============================================================
+	//  NUEVO: Mapa de huesos y contador — necesarios para Animator
+	// ============================================================
+	map<string, BoneInfo> boneInfoMap;
+	int boneCount = 0;
+
+	// Getters para que Animator pueda acceder al mapa de huesos
+	map<string, BoneInfo>& GetBoneInfoMap() { return boneInfoMap; }
+	int GetBoneCount() const { return boneCount; }
+
 	/*  Functions   */
 	// Constructor, expects a filepath to a 3D model.
 	Model(GLchar *path)
@@ -46,7 +56,6 @@ private:
 	vector<Mesh> meshes;
 	string directory;
 	vector<Texture> textures_loaded;	// Stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
-
 										/*  Functions   */
 										// Loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
 	void loadModel(string path)
@@ -88,6 +97,7 @@ private:
 		}
 	}
 
+
 	Mesh processMesh(aiMesh *mesh, const aiScene *scene)
 	{
 		// Data to fill
@@ -99,6 +109,14 @@ private:
 		for (GLuint i = 0; i < mesh->mNumVertices; i++)
 		{
 			Vertex vertex;
+
+			// NUEVO: inicializar BoneIDs y Weights a valores nulos
+			for (int b = 0; b < MAX_BONE_INFLUENCE; b++)
+			{
+				vertex.BoneIDs[b] = -1;   // -1 = sin hueso asignado
+				vertex.Weights[b] = 0.0f;
+			}
+
 			glm::vec3 vector; // We declare a placeholder vector since assimp uses its own vector class that doesn't directly convert to glm's vec3 class so we transfer the data to this placeholder glm::vec3 first.
 
 							  // Positions
@@ -160,11 +178,107 @@ private:
 			// 2. Specular maps
 			vector<Texture> specularMaps = this->loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
 			textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+
+			// --------------------------------------------------------
+			// NUEVO: Si no hay textura diffuse, crear una textura de
+			// color sólido a partir del color del material de Blender.
+			// Esto soluciona el problema de modelos sin UV/textura real.
+			// --------------------------------------------------------
+			if (diffuseMaps.empty())
+			{
+				aiColor4D color(1.0f, 1.0f, 1.0f, 1.0f);
+				// Intentar leer Kd (color difuso del material)
+				material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
+
+				// Crear textura de 1x1 píxel con ese color
+				GLuint texID;
+				glGenTextures(1, &texID);
+				glBindTexture(GL_TEXTURE_2D, texID);
+
+				unsigned char pixel[4] = {
+					(unsigned char)(color.r * 255),
+					(unsigned char)(color.g * 255),
+					(unsigned char)(color.b * 255),
+					(unsigned char)(color.a * 255)
+				};
+
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0,
+					GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glBindTexture(GL_TEXTURE_2D, 0);
+
+				Texture solidTex;
+				solidTex.id = texID;
+				solidTex.type = "texture_diffuse";
+				solidTex.path = aiString("__solid_color__");
+				textures.push_back(solidTex);
+			}
 		}
+		// NUEVO: extraer pesos de huesos ANTES de devolver la malla
+		ExtractBoneWeights(vertices, mesh, scene);
 
 		// Return a mesh object created from the extracted mesh data
 		return Mesh(vertices, indices, textures);
 	}
+
+	// ----------------------------------------------------------
+	//  NUEVO: Lee los bones del mesh y rellena BoneIDs / Weights
+	//         en cada vértice afectado.
+	// ----------------------------------------------------------
+	void ExtractBoneWeights(vector<Vertex>& vertices, aiMesh* mesh, const aiScene* scene)
+	{
+		for (unsigned int boneIdx = 0; boneIdx < mesh->mNumBones; boneIdx++)
+		{
+			aiBone* aiBone_ptr = mesh->mBones[boneIdx];
+			string  boneName = aiBone_ptr->mName.C_Str();
+			int     boneID = -1;
+
+			// Si el hueso es nuevo, registrarlo
+			if (boneInfoMap.find(boneName) == boneInfoMap.end())
+			{
+				BoneInfo bi;
+				bi.id = boneCount;
+
+				// Convertir aiMatrix4x4 → glm::mat4 (column-major)
+				aiMatrix4x4 m = aiBone_ptr->mOffsetMatrix;
+				bi.offsetMatrix = glm::mat4(
+					m.a1, m.b1, m.c1, m.d1,
+					m.a2, m.b2, m.c2, m.d2,
+					m.a3, m.b3, m.c3, m.d3,
+					m.a4, m.b4, m.c4, m.d4
+				);
+
+				boneInfoMap[boneName] = bi;
+				boneID = boneCount++;
+			}
+			else
+			{
+				boneID = boneInfoMap[boneName].id;
+			}
+
+			// Repartir los pesos a los vértices que este hueso afecta
+			for (unsigned int w = 0; w < aiBone_ptr->mNumWeights; w++)
+			{
+				int   vertexID = aiBone_ptr->mWeights[w].mVertexId;
+				float weight = aiBone_ptr->mWeights[w].mWeight;
+
+				if (weight <= 0.0f) continue; // ignorar influencias nulas
+
+				// Buscar el primer slot libre en ese vértice
+				for (int slot = 0; slot < MAX_BONE_INFLUENCE; slot++)
+				{
+					if (vertices[vertexID].BoneIDs[slot] == -1)
+					{
+						vertices[vertexID].BoneIDs[slot] = boneID;
+						vertices[vertexID].Weights[slot] = weight;
+						break;
+					}
+				}
+			}
+		}
+	}
+
 
 	// Checks all material textures of a given type and loads the textures if they're not loaded yet.
 	// The required info is returned as a Texture struct.

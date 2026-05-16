@@ -36,6 +36,9 @@
     <None Include="Shader\lighting.vs">
       <Filter>Archivos de origen\Shader</Filter>
     </None>
+    <None Include="Animation.vs">
+      <Filter>Archivos de origen\Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h">
@@ -46,6 +49,15 @@
     </ClInclude>
     <ClInclude Include="Camera.h">
       <Filter>Archivos de origen</Filter>
+    </ClInclude>
+    <ClInclude Include="Animator.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="BoneInfo.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimacionPerro.h">
+      <Filter>Archivos de encabezado</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

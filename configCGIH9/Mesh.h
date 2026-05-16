@@ -19,6 +19,8 @@
 
 using namespace std;
 
+#define MAX_BONE_INFLUENCE 4
+
 struct Vertex
 {
 	// Position
@@ -27,6 +29,9 @@ struct Vertex
 	glm::vec3 Normal;
 	// TexCoords
 	glm::vec2 TexCoords;
+	//Para Animacion esquelética
+	int BoneIDs[MAX_BONE_INFLUENCE];
+	float Weights[MAX_BONE_INFLUENCE];
 };
 
 struct Texture
@@ -52,6 +57,13 @@ public:
 		this->indices = indices;
 		this->textures = textures;
 
+		// Inicializar BoneIDs y Weights a 0
+		for (auto& v : this->vertices) {
+			for (int i = 0; i < MAX_BONE_INFLUENCE; i++) {
+				v.BoneIDs[i] = 0;
+				v.Weights[i] = 0.0f;
+			}
+		}
 		// Now that we have all the required data, set the vertex buffers and its attribute pointers.
 		this->setupMesh();
 	}
@@ -137,6 +149,12 @@ private:
 		// Vertex Texture Coords
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid *)offsetof(Vertex, TexCoords));
+		// location 3: BoneIDs
+		glEnableVertexAttribArray(3);
+		glVertexAttribIPointer(3, MAX_BONE_INFLUENCE, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, BoneIDs));
+		// location 4: Weights
+		glEnableVertexAttribArray(4);
+		glVertexAttribPointer(4, MAX_BONE_INFLUENCE, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Weights));
 
 		glBindVertexArray(0);
 	}
