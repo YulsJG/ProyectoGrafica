@@ -100,6 +100,21 @@ public:
 		{
 			glActiveTexture(GL_TEXTURE0 + i);
 			glBindTexture(GL_TEXTURE_2D, 0);
+			// ... dentro del for de texturas en Mesh::Draw ...
+			glBindTexture(GL_TEXTURE_2D, this->textures[i].id);
+
+			// --- AÑADE ESTO AQUÍ PARA REPARAR LO BORROSO ---
+			glGenerateMipmap(GL_TEXTURE_2D);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+			// Filtro Anisotrópico (si lo soporta tu PC)
+			float maxAnisotropy = 0.0f;
+			glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
+			if (maxAnisotropy > 0.0f) {
+				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAnisotropy);
+			}
+			// ----------------------------------------------
 		}
 	}
 

@@ -146,9 +146,12 @@ int main()
         lightingShader.Use();
         glUniform1i(glGetUniformLocation(lightingShader.Program, "Material.difuse"), 0);
         glUniform1i(glGetUniformLocation(lightingShader.Program, "Material.specular"), 1);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        // Camera position
+        
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        //glGenerateMipmap(GL_TEXTURE_2D);
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        //// Camera position
         GLint viewPosLoc = glGetUniformLocation(lightingShader.Program, "viewPos");
         glUniform3f(
             viewPosLoc,
