@@ -33,8 +33,7 @@ int SCREEN_WIDTH, SCREEN_HEIGHT;
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void MouseCallback(GLFWwindow* window, double xPos, double yPos);
 void DoMovement();
-void dibujarStandIndividual(Shader& lightingShader, Model& Mampara, Model& Mesa, Model& Silla, glm::vec3 posicionGlobal, float rotacionY);
-GLuint CrearTexturaColor(float r, float g, float b); 
+void dibujarStandIndividual(Shader& lightingShader, Model& Mampara, Model& Mesa, Model& Silla, glm::vec3 posicionGlobal, float rotacionY); 
 
 // Camera (MEJOR POSICIÓN)
 Camera camera(glm::vec3(0.0f, 10.0f, 50.0f));
@@ -196,7 +195,6 @@ int main()
     // Cargar la animación 
     animPersona = new Animation("Models/Persona/Walking.dae",personaje2.GetBoneInfoMap());
 
-    GLuint texPersona = CrearTexturaColor(0.87f, 0.72f, 0.60f);
 
     // Game loop
     while (!glfwWindowShouldClose(window))
@@ -342,19 +340,29 @@ int main()
         Estatua.Draw(lightingShader);
         
 		//Aparicion stands agrupaciones
+        // ── VELOCIDAD DE APARICIÓN (Ajusta este número: más grande = más rápido) ──
+        //float velocidadAparicion = 8.0f;
         if (estadoStands == 1 && escalaAnimacion < 1.0f) {
             escalaAnimacion += 0.02f;
+            //escalaAnimacion += velocidadAparicion * deltaTime;
+            if (escalaAnimacion > 1.0f) escalaAnimacion = 1.0f;
         }
         else if (estadoStands != 1 && escalaAnimacion > 0.0f) {
             escalaAnimacion -= 0.02f; // Si el estado cambia a Feria (2), estos bajan a 0
+            //escalaAnimacion -= velocidadAparicion * deltaTime;
+            if (escalaAnimacion < 0.0f) escalaAnimacion = 0.0f;
         }
 
         // Lógica de escala para la Feria de Empleo
         if (estadoStands == 2 && escalaFeria < 1.0f) {
             escalaFeria += 0.02f;
+            //escalaFeria += velocidadAparicion * deltaTime;
+            if (escalaFeria > 1.0f) escalaFeria = 1.0f;
         }
         else if (estadoStands != 2 && escalaFeria > 0.0f) {
             escalaFeria -= 0.02f;
+            //escalaFeria -= velocidadAparicion * deltaTime;
+            if (escalaFeria < 0.0f) escalaFeria = 0.0f;
         }
 
 		//Dibujar stands agrupaciones
@@ -365,7 +373,7 @@ int main()
         }
 
 		// Dibujar stands Feria de Empleo
-        if (escalaFeria > 0.0f) {
+        //if (escalaFeria > 0.0f) {
             // --- STAND IZQUIERDO ---
             model = glm::mat4(1.0f);
             model = glm::translate(model, glm::vec3(-9.90163f, -30.0f, -37.5067f));
@@ -412,7 +420,7 @@ int main()
             StandCentro4.Draw(lightingShader);
 
 
-        }
+        //}
 
         /* Matriz model de la persona
         glm::mat4 modelPersona = glm::mat4(1.0f);
@@ -468,16 +476,15 @@ int main()
                     1, GL_FALSE, glm::value_ptr(animator.finalBoneMatrices[i]));
             }
 
-            // Matriz del modelo
-            glm::mat4 modelPersona = glm::mat4(1.0f);
-            modelPersona = glm::translate(modelPersona, posPersona);
-            modelPersona = glm::rotate(modelPersona,glm::radians(rotPersona),glm::vec3(0.0f, 1.0f, 0.0f));
-            modelPersona = glm::scale(modelPersona, glm::vec3(0.05f)); // ajusta tamaño
-            glUniformMatrix4fv(glGetUniformLocation(animShader.Program, "model"),1, GL_FALSE, glm::value_ptr(modelPersona));
+            //// Matriz del modelo
+            //glm::mat4 modelPersona = glm::mat4(1.0f);
+            //modelPersona = glm::translate(modelPersona, posPersona);
+            //modelPersona = glm::rotate(modelPersona,glm::radians(rotPersona),glm::vec3(0.0f, 1.0f, 0.0f));
+            //modelPersona = glm::scale(modelPersona, glm::vec3(0.05f)); // ajusta tamaño
+            //glUniformMatrix4fv(glGetUniformLocation(animShader.Program, "model"),1, GL_FALSE, glm::value_ptr(modelPersona));
 
             // Textura de color y dibujar
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, texPersona);
             //personaje2.Draw(animShader);
         }
 
@@ -527,7 +534,7 @@ int main()
             // Pata trasera izquierda
             model = modelTemp2;
             model = glm::translate(model, glm::vec3(0.082f, -0.046f, -0.218f));
-            model = glm::rotate(model, glm::radians(perroRLegs), glm::vec3(1.0f, 0.0f, 0.0f));
+            model = glm::rotate(model, glm::radians(perroRLegs), glm::vec3(-1.0f, 0.0f, 0.0f));
             glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(model));
             B_LeftLeg.Draw(lightingShader);
 
@@ -595,9 +602,9 @@ int main()
         }
 
         // Imprimir posición de la cámara en la consola
-        std::cout << "Posicion Camara: X: " << camera.GetPosition().x
+        /*std::cout << "Posicion Camara: X: " << camera.GetPosition().x
             << " | Y: " << camera.GetPosition().y
-            << " | Z: " << camera.GetPosition().z << std::endl;
+            << " | Z: " << camera.GetPosition().z << std::endl*/
 
         glfwSwapBuffers(window);
     }
@@ -736,19 +743,3 @@ void MouseCallback(GLFWwindow* window, double xPos, double yPos)
     camera.ProcessMouseMovement(xOffset, yOffset);
 }
 
-GLuint CrearTexturaColor(float r, float g, float b)
-{
-    GLuint texID;
-    glGenTextures(1, &texID);
-    glBindTexture(GL_TEXTURE_2D, texID);
-    unsigned char pixel[3] = {
-        (unsigned char)(r * 255),
-        (unsigned char)(g * 255),
-        (unsigned char)(b * 255)
-    };
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, pixel);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    return texID;
-}

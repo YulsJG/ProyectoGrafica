@@ -46,7 +46,8 @@ bool  perroPlay = false;
 bool  perroVisible = false;
 int   perroSegmento = 0;
 int   perroCurrSteps = 0;
-int   perroMaxSteps = 200;   // pasos por segmento (más = más lento)
+int   perroMaxSteps = 80;   // pasos por segmento (más = más lento)
+
 
 // ── Evaluación de Bézier Cúbica ──────────────────────────────
 // B(t) = (1-t)³·P0 + 3(1-t)²t·C1 + 3(1-t)t²·C2 + t³·P1
@@ -237,10 +238,10 @@ void AnimacionPerro()
 
     // Patas: ciclo de carrera con seno
     float tiempo = (float)glfwGetTime();
-    perroFLegs = 30.0f * sinf(tiempo * 8.0f);
-    perroRLegs = -30.0f * sinf(tiempo * 8.0f);
-    perroHead = 3.0f * sinf(tiempo * 4.0f);
-    perroTail = 20.0f * sinf(tiempo * 5.0f);
+    perroFLegs = 45.0f * sinf(tiempo * 10.0f);
+    perroRLegs = 45.0f * sinf(tiempo * 10.0f + glm::radians(90.0f));
+    perroHead = 8.0f * sinf(tiempo * 5.0f);
+    perroTail = 35.0f * sinf(tiempo * 6.0f);
 
     perroCurrSteps++;
 }

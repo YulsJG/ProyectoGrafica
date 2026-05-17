@@ -86,8 +86,8 @@ const float T_DESPEGUE = 2.5f;
 
 // Parámetros de aleteo en vuelo
 static float aleteoFase = 0.0f;   // fase acumulada para sin()
-const  float ALETEO_VEL = 10.0f;   // velocidad angular del aleteo
-const  float ALETEO_AMP = 35.0f;  // amplitud máxima en grados
+const  float ALETEO_VEL = 14.0f;   // velocidad angular del aleteo
+const  float ALETEO_AMP = 50.0f;  // amplitud máxima en grados
 
 // ─────────────────────────────────────────────────────────────
 //  UTILIDADES
@@ -182,10 +182,16 @@ void AnimacionPajaro(float deltaTime) {
         pajaroPosY = PAJARO_STAND_POS.y;
         pajaroPosZ = PAJARO_STAND_POS.z;
 
-        pajaroAlaAngle = 5.0f;   // alas cerradas
-        pajaroCola = 0.0f;
-        pajaroCabeza = 0.0f;
-        pajaroCuerpoTilt = 0.0f;
+        //pajaroAlaAngle = 5.0f;   // alas cerradas
+        //pajaroCola = 0.0f;
+        //pajaroCabeza = 0.0f;
+        //pajaroCuerpoTilt = 0.0f;
+        // Pequeño balanceo continuo mientras está parado
+        float balanceo = sinf(pajaroTimer * 3.0f) * 3.0f;
+        pajaroCuerpoTilt = balanceo;
+        pajaroCabeza = sinf(pajaroTimer * 2.5f) * 5.0f;  // gira cabeza suave
+        pajaroAlaAngle = 5.0f + fabsf(sinf(pajaroTimer * 2.0f)) * 8.0f; // alas respiran
+        pajaroCola = sinf(pajaroTimer * 4.0f) * 4.0f;  // colita se mueve
 
         if (pajaroTimer >= T_REPOSO) {
             pajaroEstado = PAJARO_SACUDIDA;
