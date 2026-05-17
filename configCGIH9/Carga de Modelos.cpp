@@ -21,6 +21,8 @@
 // Other Libs
 #include "SOIL2/SOIL2.h"
 #include "stb_image.h"
+#include "Animator.h"
+#include "AnimacionPerro.h"
 
 // Properties
 const GLuint WIDTH = 1200, HEIGHT = 800;
@@ -31,6 +33,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 void MouseCallback(GLFWwindow* window, double xPos, double yPos);
 void DoMovement();
 void dibujarStandIndividual(Shader& lightingShader, Model& Mampara, Model& Mesa, Model& Silla, glm::vec3 posicionGlobal, float rotacionY);
+GLuint CrearTexturaColor(float r, float g, float b); 
 
 // Camera (MEJOR POSICIÓN)
 Camera camera(glm::vec3(0.0f, 10.0f, 50.0f));
@@ -41,7 +44,9 @@ bool firstMouse = true;
 
 //Aparecer stands
 bool mostrarStands = false;
-float escalaAnimacion = 0.0f;
+float escalaAnimacion = 0.0f; //Stands agrupaciones
+int estadoStands = 0;
+float escalaFeria = 0.0f;  //Stands Feria de Empleo 
 
 //Posiciones stands
 glm::vec3 posicionesStands[] = {
@@ -57,6 +62,31 @@ float rotacionesStands[] = {
     180.0f,  // Rotación para el stand del centro
     90.0f   // Rotación para el stand de la derecha
 };
+
+// Variables globales de animación
+Animator animator;
+Animation* animPersona = nullptr;
+bool personaVisible = false;   // empieza oculta
+bool animIniciada = false;
+
+// Variables globales de la persona caminante
+struct Waypoint {
+    glm::vec3 posicion;
+};
+
+// Define los puntos por donde camina — ajusta las coords a tu explanada
+vector<Waypoint> ruta = {
+    { glm::vec3(80.0f, -28.0f, -60.0f) },   // Punto A: entrada
+    { glm::vec3(60.0f, -28.0f,  20.0f) },   // Punto B: centro
+    { glm::vec3(20.0f, -28.0f,  80.0f) },   // Punto C: fondo
+    { glm::vec3(-10.0f, -28.0f,  20.0f) },   // Punto D: regresa
+    { glm::vec3(80.0f, -28.0f, -60.0f) },   // Punto E: vuelve al inicio
+};
+
+int   waypointActual = 0;
+float velocidadPersona = 15.0f;   // unidades por segundo, ajusta
+glm::vec3 posPersona = ruta[0].posicion;
+float rotPersona = 0.0f;    // rotación Y en grados
 
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
@@ -99,6 +129,7 @@ int main()
     // Shader
     //Shader shader("Shader/modelLoading.vs", "Shader/modelLoading.frag");
     Shader lightingShader("Shader/modelLoading.vs", "Shader/modelLoading.frag");
+    Shader animShader("Shader/Animation.vs", "Shader/modelLoading.frag"); 
 
     // Modelo Escuela
     Model modeloFI((char*)"Models/Explanadafi/explanadafi.obj");
@@ -112,6 +143,29 @@ int main()
 	Model stand1((char*)"Models/Muebles/StandFeria.obj");
     Model Mesa((char*)"Models/Muebles/MesaG.obj");
     Model Mampara((char*)"Models/Muebles/Mampara.obj");
+
+    //Stands2
+    Model StandIzq((char*)"Models/Stands/StandIzq.obj");
+    Model StandDer((char*)"Models/Stands/StandDer.obj");
+    Model StandCentro((char*)"Models/Stands/StandCentro.obj");
+    Model StandCentro2((char*)"Models/Stands/StandCentro2.obj");
+    Model StandCentro3((char*)"Models/Stands/StandCentro3.obj");
+    Model StandCentro4((char*)"Models/Stands/StandCentro4.obj");
+
+    //Persona
+    Model personaje((char*)"Models/Persona/Persona.fbx");
+    Model personaje2((char*)"Models/Persona/Walking.dae");
+
+    //Perro (Cambiar el modelo despues)
+    Model DogBody((char*)"Models/Perro/DogBody.obj");
+    Model HeadDog((char*)"Models/Perro/HeadDog.obj");
+    Model DogTail((char*)"Models/Perro/TailDog.obj");
+    Model F_RightLeg((char*)"Models/Perro/F_RightLegDog.obj");
+    Model F_LeftLeg((char*)"Models/Perro/F_LeftLegDog.obj");
+    Model B_RightLeg((char*)"Models/Perro/B_RightLegDog.obj");
+    Model B_LeftLeg((char*)"Models/Perro/B_LeftLegDog.obj");
+
+    InicializarRutaPerro();
 
     //// PROYECCIÓN CORREGIDA
     //glm::mat4 projection = glm::perspective(
@@ -128,6 +182,11 @@ int main()
         2000.0f
     );
 
+    // Cargar la animación 
+    animPersona = new Animation("Models/Persona/Walking.dae",personaje2.GetBoneInfoMap());
+
+    GLuint texPersona = CrearTexturaColor(0.87f, 0.72f, 0.60f);
+
     // Game loop
     while (!glfwWindowShouldClose(window))
     {
@@ -137,6 +196,9 @@ int main()
 
         glfwPollEvents();
         DoMovement();
+        AnimacionPerro();
+
+        animator.Update(deltaTime);
 
         // Fondo
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -146,12 +208,24 @@ int main()
         lightingShader.Use();
         glUniform1i(glGetUniformLocation(lightingShader.Program, "Material.difuse"), 0);
         glUniform1i(glGetUniformLocation(lightingShader.Program, "Material.specular"), 1);
-        
-        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        //glGenerateMipmap(GL_TEXTURE_2D);
-        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        //// Camera position
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+		//Shader animShader
+        animShader.Use();
+        glUniform1i(glGetUniformLocation(animShader.Program, "Material.difuse"), 0);
+        glUniform1i(glGetUniformLocation(animShader.Program, "Material.specular"), 1);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        auto& matrices = animator.finalBoneMatrices;
+        for (int i = 0; i < (int)matrices.size(); i++) {
+            string loc = "finalBonesMatrices[" + to_string(i) + "]";
+            glUniformMatrix4fv(glGetUniformLocation(animShader.Program, loc.c_str()),
+                1, GL_FALSE, glm::value_ptr(matrices[i]));
+        }
+
+        // Camera position
         GLint viewPosLoc = glGetUniformLocation(lightingShader.Program, "viewPos");
         glUniform3f(
             viewPosLoc,
@@ -210,11 +284,11 @@ int main()
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-      
+
         glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
-		// Carga modelo FI
+        // Carga modelo FI
         glm::mat4 model = glm::mat4(1.0f);
         // Escala    
         //model = glm::translate(model, glm::vec3(0.0f, -1.0f, -5.0f));
@@ -247,25 +321,210 @@ int main()
         model = glm::mat4(1.0f);
         // 1. Posicionamiento 
         model = glm::translate(model, glm::vec3(98.3464f, -22.0f, -109.688f));
-		//Rotación
+        //Rotación
         model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         // 3. Escala 
         model = glm::scale(model, glm::vec3(10.0f, 10.0f, 10.0f));
         // Enviamos la matriz al shader y dibujamos
         glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
         Estatua.Draw(lightingShader);
+        
+		//Aparicion stands agrupaciones
+        if (estadoStands == 1 && escalaAnimacion < 1.0f) {
+            escalaAnimacion += 0.02f;
+        }
+        else if (estadoStands != 1 && escalaAnimacion > 0.0f) {
+            escalaAnimacion -= 0.02f; // Si el estado cambia a Feria (2), estos bajan a 0
+        }
 
-        //Aparicion stands
-        if (mostrarStands && escalaAnimacion < 1.0f) {
-            escalaAnimacion += 0.02f; // Velocidad de aparición
+        // Lógica de escala para la Feria de Empleo
+        if (estadoStands == 2 && escalaFeria < 1.0f) {
+            escalaFeria += 0.02f;
         }
-        else if (!mostrarStands && escalaAnimacion > 0.0f) {
-            escalaAnimacion -= 0.02f; // Desaparece suavemente
+        else if (estadoStands != 2 && escalaFeria > 0.0f) {
+            escalaFeria -= 0.02f;
         }
+
+		//Dibujar stands agrupaciones
         if (escalaAnimacion > 0.0f) {
             for (int i = 0; i < 3; i++) { // Ahora iteramos 3 veces
                 dibujarStandIndividual(lightingShader, Mampara, Mesa, Silla, posicionesStands[i], rotacionesStands[i]);
             }
+        }
+
+		// Dibujar stands Feria de Empleo
+        if (escalaFeria > 0.0f) {
+            // --- STAND IZQUIERDO ---
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(-9.90163f, -30.0f, -37.5067f));
+            model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.2f * escalaFeria)); // Multiplicamos por la animación
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandIzq.Draw(lightingShader);
+            
+            // --- STAND DERECHO ---
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(130.0f, -30.0f, -37.5067f));
+            model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.3f * escalaFeria));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandDer.Draw(lightingShader);
+
+            // --- STAND CENTRO ---
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(52.8673f, -28.0f, 105.0f));
+            model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.1f * escalaFeria));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandCentro.Draw(lightingShader);
+                //Sillas
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(52.8673f, -26.0f, 100.0f));
+            model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.2f * escalaFeria));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandCentro2.Draw(lightingShader);
+                //Mueble enfrente
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(52.8673f, -28.0f, 100.0f));
+            model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.2f * escalaFeria));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandCentro3.Draw(lightingShader);
+                //Plantas
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(52.8673f, -28.0f, 90.0f));
+            model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.2f * escalaFeria));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+            StandCentro4.Draw(lightingShader);
+
+
+        }
+
+        /* Matriz model de la persona
+        glm::mat4 modelPersona = glm::mat4(1.0f);
+        modelPersona = glm::translate(modelPersona, glm::vec3(52.8673f, -28.0f, 112.395f));
+        modelPersona = glm::scale(modelPersona, glm::vec3(0.1f));
+        glUniformMatrix4fv(glGetUniformLocation(animShader.Program, "model"),
+            1, GL_FALSE, glm::value_ptr(modelPersona));
+        personaje.Draw(animShader);*/
+
+        // Actualizar posición aunque no sea visible aún
+        if (personaVisible)
+        {
+            // ── Lógica de movimiento por waypoints ──
+            if (waypointActual < (int)ruta.size())
+            {
+                glm::vec3 destino = ruta[waypointActual].posicion;
+                glm::vec3 direccion = destino - posPersona;
+                float distancia = glm::length(direccion);
+
+                if (distancia > 1.0f)
+                {
+                    posPersona += glm::normalize(direccion) * velocidadPersona * deltaTime;
+                    rotPersona = glm::degrees(atan2(direccion.x, direccion.z));
+                }
+                else
+                {
+                    waypointActual++;
+                    if (waypointActual >= (int)ruta.size())
+                        waypointActual = 0;
+                }
+            }
+
+            // ── Actualizar animación ──
+            animator.Update(deltaTime);
+
+            // ── Dibujar persona ──
+            animShader.Use();
+
+            // Enviar luces (copia los mismos valores que usas en lightingShader)
+            glUniform3f(glGetUniformLocation(animShader.Program, "dirLight.direction"), -0.3f, -1.0f, -0.4f);
+            glUniform3f(glGetUniformLocation(animShader.Program, "dirLight.ambient"), 0.45f, 0.45f, 0.45f);
+            glUniform3f(glGetUniformLocation(animShader.Program, "dirLight.diffuse"), 0.75f, 0.75f, 0.75f);
+            glUniform3f(glGetUniformLocation(animShader.Program, "dirLight.specular"), 0.25f, 0.25f, 0.25f);
+            glUniform1f(glGetUniformLocation(animShader.Program, "material.shininess"), 5.0f);
+            glUniform3f(glGetUniformLocation(animShader.Program, "viewPos"),camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
+            glUniformMatrix4fv(glGetUniformLocation(animShader.Program, "view"),1, GL_FALSE, glm::value_ptr(view));
+            glUniformMatrix4fv(glGetUniformLocation(animShader.Program, "projection"),1, GL_FALSE, glm::value_ptr(projection));
+
+            // Enviar matrices de huesos
+            for (int i = 0; i < 100; i++) {
+                string loc = "finalBonesMatrices[" + to_string(i) + "]";
+                glUniformMatrix4fv(glGetUniformLocation(animShader.Program, loc.c_str()),
+                    1, GL_FALSE, glm::value_ptr(animator.finalBoneMatrices[i]));
+            }
+
+            // Matriz del modelo
+            glm::mat4 modelPersona = glm::mat4(1.0f);
+            modelPersona = glm::translate(modelPersona, posPersona);
+            modelPersona = glm::rotate(modelPersona,glm::radians(rotPersona),glm::vec3(0.0f, 1.0f, 0.0f));
+            modelPersona = glm::scale(modelPersona, glm::vec3(0.05f)); // ajusta tamaño
+            glUniformMatrix4fv(glGetUniformLocation(animShader.Program, "model"),1, GL_FALSE, glm::value_ptr(modelPersona));
+
+            // Textura de color y dibujar
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, texPersona);
+            //personaje2.Draw(animShader);
+        }
+
+        // ── Dibujar perro ──────────────────────────────────────────
+        if (perroVisible)
+        {
+            glm::mat4 modelTemp2;
+
+            // Cuerpo (raíz — todo lo demás depende de esta matriz)
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(perroPosX, perroPosY, perroPosZ));
+            model = glm::rotate(model, glm::radians(perroRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(15.0f));   // ajusta si es muy grande/pequeño
+            modelTemp2 = model;
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),
+                1, GL_FALSE, glm::value_ptr(model));
+            DogBody.Draw(lightingShader);
+
+            // Cabeza
+            model = modelTemp2;
+            model = glm::translate(model, glm::vec3(0.0f, 0.093f, 0.208f));
+            model = glm::rotate(model, glm::radians(perroHead), glm::vec3(1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(model));
+            HeadDog.Draw(lightingShader);
+
+            // Cola
+            model = modelTemp2;
+            model = glm::translate(model, glm::vec3(0.0f, 0.026f, -0.288f));
+            model = glm::rotate(model, glm::radians(perroTail), glm::vec3(0.0f, 0.0f, -1.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(model));
+            DogTail.Draw(lightingShader);
+
+            // Pata delantera izquierda
+            model = modelTemp2;
+            model = glm::translate(model, glm::vec3(0.112f, -0.044f, 0.074f));
+            model = glm::rotate(model, glm::radians(perroFLegs), glm::vec3(-1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(model));
+            F_LeftLeg.Draw(lightingShader);
+
+            // Pata delantera derecha (fase opuesta)
+            model = modelTemp2;
+            model = glm::translate(model, glm::vec3(-0.111f, -0.055f, 0.074f));
+            model = glm::rotate(model, glm::radians(-perroFLegs), glm::vec3(-1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(model));
+            F_RightLeg.Draw(lightingShader);
+
+            // Pata trasera izquierda
+            model = modelTemp2;
+            model = glm::translate(model, glm::vec3(0.082f, -0.046f, -0.218f));
+            model = glm::rotate(model, glm::radians(perroRLegs), glm::vec3(1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(model));
+            B_LeftLeg.Draw(lightingShader);
+
+            // Pata trasera derecha
+            model = modelTemp2;
+            model = glm::translate(model, glm::vec3(-0.083f, -0.057f, -0.231f));
+            model = glm::rotate(model, glm::radians(-perroRLegs), glm::vec3(-1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(model));
+            B_RightLeg.Draw(lightingShader);
         }
 
         // Imprimir posición de la cámara en la consola
@@ -341,9 +600,40 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         else if (action == GLFW_RELEASE)
             keys[key] = false;
     }
+	//Control de aparición de stands
+    if (key == GLFW_KEY_F && action == GLFW_PRESS) {
+        // Si presionas F, activas Feria (2) o apagas si ya estaba
+        estadoStands = (estadoStands == 2) ? 0 : 2;
+    }
+    if (key == GLFW_KEY_G && action == GLFW_PRESS) {
+        // Si presionas G, activas los otros (1) o apagas
+        estadoStands = (estadoStands == 1) ? 0 : 1;
+    }
+    if (key == GLFW_KEY_P && action == GLFW_PRESS)
+    {
+        personaVisible = true;
 
-    if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
-        mostrarStands = !mostrarStands; // Cambia el estado
+        if (!animIniciada) {
+            animator.loop = true;
+            animator.PlayAnimation(animPersona);
+            animIniciada = true;
+        }
+    }
+    if (key == GLFW_KEY_O && action == GLFW_PRESS)
+    {
+        if (!perroPlay) {
+            ResetPerro();
+            perroVisible = true;
+            perroPlay = true;
+            //perroPlayIndex = 0;
+            perroCurrSteps = 0;
+            printf("Perro activado!\n");
+        }
+        else {
+            perroPlay = false;
+            perroVisible = false;
+            printf("Perro detenido.\n");
+        }
     }
 }
 
@@ -364,4 +654,21 @@ void MouseCallback(GLFWwindow* window, double xPos, double yPos)
     lastY = yPos;
 
     camera.ProcessMouseMovement(xOffset, yOffset);
+}
+
+GLuint CrearTexturaColor(float r, float g, float b)
+{
+    GLuint texID;
+    glGenTextures(1, &texID);
+    glBindTexture(GL_TEXTURE_2D, texID);
+    unsigned char pixel[3] = {
+        (unsigned char)(r * 255),
+        (unsigned char)(g * 255),
+        (unsigned char)(b * 255)
+    };
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, pixel);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return texID;
 }
