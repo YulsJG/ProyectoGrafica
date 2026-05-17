@@ -59,6 +59,9 @@
     <ClInclude Include="AnimacionPerro.h">
       <Filter>Archivos de encabezado</Filter>
     </ClInclude>
+    <ClInclude Include="AnimacionPajaro.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Carga de Modelos.cpp">

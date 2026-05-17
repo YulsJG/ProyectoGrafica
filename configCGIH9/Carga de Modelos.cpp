@@ -23,6 +23,7 @@
 #include "stb_image.h"
 #include "Animator.h"
 #include "AnimacionPerro.h"
+#include "AnimacionPajaro.h"
 
 // Properties
 const GLuint WIDTH = 1200, HEIGHT = 800;
@@ -167,6 +168,16 @@ int main()
 
     InicializarRutaPerro();
 
+    //Pajaro
+    Model BirdBody((char*)"Models/Pajaro/CuerpoPajaro2.obj");
+    Model BirdTail((char*)"Models/Pajaro/ColitaPajaro.obj");
+    Model P_patader((char*)"Models/Pajaro/PataDer.obj");
+    Model P_pataizq((char*)"Models/Pajaro/PataIzq.obj");
+    Model P_alader((char*)"Models/Pajaro/AlaIzq2.obj");
+    Model P_alaizq((char*)"Models/Pajaro/AlaDer2.obj");
+
+    InicializarPajaro();
+
     //// PROYECCIÓN CORREGIDA
     //glm::mat4 projection = glm::perspective(
     //    glm::radians(camera.GetZoom()),
@@ -197,6 +208,7 @@ int main()
         glfwPollEvents();
         DoMovement();
         AnimacionPerro();
+        AnimacionPajaro(deltaTime);
 
         animator.Update(deltaTime);
 
@@ -527,6 +539,61 @@ int main()
             B_RightLeg.Draw(lightingShader);
         }
 
+		//Dibujar pájaro
+        if (pajaroVisible)
+        {
+            glm::mat4 modelBase;
+
+            // ── Cuerpo (raíz) ──────────────────────────────────
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(pajaroPosX, pajaroPosY, pajaroPosZ));
+            model = glm::rotate(model, glm::radians(pajaroRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::rotate(model, glm::radians(pajaroCuerpoTilt), glm::vec3(0.0f, 0.0f, 1.0f));
+            model = glm::scale(model, glm::vec3(0.3f));   // ajusta escala a tu modelo
+            modelBase = model;
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),
+                1, GL_FALSE, glm::value_ptr(model));
+            BirdBody.Draw(lightingShader);
+
+            // ── Cola ───────────────────────────────────────────
+            model = modelBase;
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, -0.15f));   // offset hacia atrás
+            model = glm::rotate(model, glm::radians(pajaroCola), glm::vec3(1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),
+                1, GL_FALSE, glm::value_ptr(model));
+            BirdTail.Draw(lightingShader);
+
+            // ── Pata derecha ───────────────────────────────────
+            model = modelBase;
+            model = glm::translate(model, glm::vec3(-0.05f, -0.08f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),
+                1, GL_FALSE, glm::value_ptr(model));
+            P_patader.Draw(lightingShader);
+
+            // ── Pata izquierda ─────────────────────────────────
+            model = modelBase;
+            model = glm::translate(model, glm::vec3(0.05f, -0.08f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),
+                1, GL_FALSE, glm::value_ptr(model));
+            P_pataizq.Draw(lightingShader);
+
+            // ── Ala derecha (bate hacia abajo con +ángulo) ──────
+            model = modelBase;
+            model = glm::translate(model, glm::vec3(-0.12f, 0.02f, 0.0f));  // pivot ala der
+            model = glm::rotate(model, glm::radians(-pajaroAlaAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),
+                1, GL_FALSE, glm::value_ptr(model));
+            P_alader.Draw(lightingShader);
+
+            // ── Ala izquierda (bate simétricamente) ────────────
+            model = modelBase;
+            model = glm::translate(model, glm::vec3(0.12f, 0.02f, 0.0f));   // pivot ala izq
+            model = glm::rotate(model, glm::radians(pajaroAlaAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),
+                1, GL_FALSE, glm::value_ptr(model));
+            P_alaizq.Draw(lightingShader);
+        }
+
         // Imprimir posición de la cámara en la consola
         std::cout << "Posicion Camara: X: " << camera.GetPosition().x
             << " | Y: " << camera.GetPosition().y
@@ -600,7 +667,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
         else if (action == GLFW_RELEASE)
             keys[key] = false;
     }
-	//Control de aparición de stands
+    //Control de aparición de stands
     if (key == GLFW_KEY_F && action == GLFW_PRESS) {
         // Si presionas F, activas Feria (2) o apagas si ya estaba
         estadoStands = (estadoStands == 2) ? 0 : 2;
@@ -634,6 +701,19 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
             perroVisible = false;
             printf("Perro detenido.\n");
         }
+    }
+    if (key == GLFW_KEY_B && action == GLFW_PRESS)   // B de Bird / Pájaro
+    {
+        if (!pajaroPlay) {
+            ActivarPajaro();
+            printf("Pajaro activado!\n");
+        }
+        else {
+            pajaroPlay = false;
+            pajaroVisible = false;
+            printf("Pajaro detenido.\n");
+        }
+
     }
 }
 

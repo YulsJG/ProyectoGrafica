@@ -1,0 +1,22 @@
+# Blender 5.1.1 MTL File: 'None'
+# www.blender.org
+
+newmtl pajaro_azul_del_este_dan_1_COK:lambert3SG.006
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd pajaro_azul.png
+
+newmtl pajaro_azul_del_este_dan_1_COK:lambert3SG.008
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd pajaro_azul.png
