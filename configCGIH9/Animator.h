@@ -113,13 +113,17 @@ public:
         const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate);
         //assert(scene && scene->mNumAnimations > animIndex);
         if (!scene || scene->mNumAnimations == 0) {
-            cout << "ERROR: El FBX no contiene animaciones!" << endl;
             duration = 0; ticksPerSecond = 30;
             return;
         }
         aiAnimation* anim = scene->mAnimations[animIndex];
         duration = (float)anim->mDuration;
         ticksPerSecond = anim->mTicksPerSecond != 0 ? (float)anim->mTicksPerSecond : 25.0f;
+        // PARCHE: Mixamo .dae a veces reporta tps=1 pero en realidad son 30
+        if (ticksPerSecond < 2.0f) {
+            cout << "WARN: tps muy bajo (" << ticksPerSecond << "), forzando a 30" << endl;
+            ticksPerSecond = 30.0f;
+        }
         ReadHierarchy(rootNode, scene->mRootNode);
         ReadBones(anim);
     }

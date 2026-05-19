@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Animation.frag" />
     <None Include="Animation.vs" />
     <None Include="Shader\lamp.frag" />
     <None Include="Shader\lamp.vs" />

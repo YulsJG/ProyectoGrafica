@@ -25,6 +25,8 @@
 #include "AnimacionPerro.h"
 #include "AnimacionPajaro.h"
 
+#define _CRT_SECURE_NO_WARNINGS
+
 // Properties
 const GLuint WIDTH = 1200, HEIGHT = 800;
 int SCREEN_WIDTH, SCREEN_HEIGHT;
@@ -63,30 +65,83 @@ float rotacionesStands[] = {
     90.0f   // Rotación para el stand de la derecha
 };
 
-// Variables globales de animación
-Animator animator;
-Animation* animPersona = nullptr;
-bool personaVisible = false;   // empieza oculta
-bool animIniciada = false;
+// ── AGENTES ────────────────────────────────────────────────────
+struct Agente {
+    glm::vec3 pos;
+    float     rotY = 0.0f;
+    int       wpActual = 0;
+    float     tiempoAnim = 0.0f;   // offset para que no estén sincronizados
+    bool      activo = false;
+};
 
-// Variables globales de la persona caminante
-struct Waypoint {
+// Rutas — ajusta las coordenadas a tu explanada
+vector<glm::vec3> rutaCompartida = {
+    glm::vec3(80.0f, -28.0f, -60.0f),   // Entrada
+    glm::vec3(60.0f, -28.0f,  20.0f),   // Centro
+    glm::vec3(20.0f, -28.0f,  80.0f),   // Fondo
+    glm::vec3(-10.0f, -28.0f,  20.0f),   // Regresa
+};
+
+//// Variables globales para ajustar en vivo
+//float offCabezaY = 0.30f;
+//float offPiernaY = -0.30f;
+//float offPiernaX = 0.10f;
+//float offBrazoY = 0.10f;
+//float offBrazoX = 0.15f;
+
+// ── SISTEMA DÍA / NOCHE ────────────────────────────────────────
+bool esDeNoche = false;
+float factorNoche = 0.0f;   // 0.0 = día pleno, 1.0 = noche plena
+float velocidadTransicion = 1.5f;  // qué tan rápido cambia
+
+// Posiciones de las lámparas (ajusta Y según la altura de tus stands)
+// Agrega tantas como stands tengas
+struct LuzPuntual {
     glm::vec3 posicion;
+    glm::vec3 colorAmbiente;
+    glm::vec3 colorDifuso;
+    glm::vec3 colorEspecular;
 };
 
-// Define los puntos por donde camina — ajusta las coords a tu explanada
-vector<Waypoint> ruta = {
-    { glm::vec3(80.0f, -28.0f, -60.0f) },   // Punto A: entrada
-    { glm::vec3(60.0f, -28.0f,  20.0f) },   // Punto B: centro
-    { glm::vec3(20.0f, -28.0f,  80.0f) },   // Punto C: fondo
-    { glm::vec3(-10.0f, -28.0f,  20.0f) },   // Punto D: regresa
-    { glm::vec3(80.0f, -28.0f, -60.0f) },   // Punto E: vuelve al inicio
-};
+LuzPuntual lucesPuntuales[] = {
+    // Stand IZQUIERDA
+    { glm::vec3(150.195f, -30.0f, -25.2517f),
+      glm::vec3(0.08f, 0.05f, 0.01f),
+      glm::vec3(3.5f,  2.2f,  0.4f),
+      glm::vec3(2.0f,  1.4f,  0.3f) },  // especular — brillo cálido
 
-int   waypointActual = 0;
-float velocidadPersona = 15.0f;   // unidades por segundo, ajusta
-glm::vec3 posPersona = ruta[0].posicion;
-float rotPersona = 0.0f;    // rotación Y en grados
+     // Stand CENTRO
+     { glm::vec3(52.8673f, -18.0f, 112.395f),
+        glm::vec3(0.08f, 0.05f, 0.01f),
+        glm::vec3(3.5f,  2.2f,  0.4f),
+        glm::vec3(2.0f,  1.4f,  0.3f) },
+
+     // Stand DERECHA
+     {glm::vec3(-17.0f, -30.0f,  -62.1774f),
+      glm::vec3(0.08f, 0.05f, 0.01f),
+      glm::vec3(3.5f,  2.2f,  0.4f),
+      glm::vec3(2.0f,  1.4f,  0.3f) },
+
+      // Cuarta apagada(el shader necesita 4, esta no hace nada)
+      {
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f)
+       },
+};
+const int NUM_LUCES = 4;
+
+
+const int NUM_AGENTES = 3;
+Agente agentes[NUM_AGENTES];
+
+float velocidadPersona = 15.0f;
+
+// Animación — UNA sola instancia compartida
+Animator    animatorPersona;
+Animation* animWalking = nullptr;
+bool        personasActivas = false;
 
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
@@ -129,7 +184,7 @@ int main()
     // Shader
     //Shader shader("Shader/modelLoading.vs", "Shader/modelLoading.frag");
     Shader lightingShader("Shader/modelLoading.vs", "Shader/modelLoading.frag");
-    Shader animShader("Shader/Animation.vs", "Shader/modelLoading.frag"); 
+    //Shader animShader("Shader/Animation.vs", "Shader/Animation.frag"); 
 
     // Modelo Escuela
     Model modeloFI((char*)"Models/Explanadafi/explanadafi.obj");
@@ -153,8 +208,14 @@ int main()
     Model StandCentro4((char*)"Models/Stands/StandCentro4.obj");
 
     //Persona
-    Model personaje((char*)"Models/Persona/Persona.fbx");
-    Model personaje2((char*)"Models/Persona/Walking.dae");
+    //Model personaje2((char*)"Models/Persona/scene.gltf");
+    Model Torso((char*)"Models/Persona/Torso.obj");
+    Model Cabeza((char*)"Models/Persona/Cabeza.obj");
+    Model Pierna((char*)"Models/Persona/Piernas.obj");
+    Model PiernaDer((char*)"Models/Persona/PiernaDer.obj");
+    Model PiernaIzq((char*)"Models/Persona/PiernaIzq.obj");
+    Model BrazoDer((char*)"Models/Persona/BrazoDer.obj");
+    Model BrazoIzq((char*)"Models/Persona/BrazoIzq.obj");
 
     //Perro (Cambiar el modelo despues)
     Model DogBody((char*)"Models/Perro/DogBody.obj");
@@ -192,8 +253,19 @@ int main()
         2000.0f
     );
 
-    // Cargar la animación 
-    animPersona = new Animation("Models/Persona/Walking.dae",personaje2.GetBoneInfoMap());
+
+    struct Agente {
+        glm::vec3 pos;
+        float rotY;
+        float offset;      // fase del walk cycle distinta por agente
+        int wpActual;
+    };
+
+    Agente agentes[3] = {
+        { glm::vec3(80.0f, -28.0f, -60.0f), 0.0f, 0.0f, 0 },
+        { glm::vec3(65.0f, -28.0f, -50.0f), 0.0f, 1.5f, 1 },  // offset diferente
+        { glm::vec3(95.0f, -28.0f, -55.0f), 0.0f, 3.0f, 2 },
+    };
 
 
     // Game loop
@@ -208,7 +280,65 @@ int main()
         AnimacionPerro();
         AnimacionPajaro(deltaTime);
 
-        animator.Update(deltaTime);
+        // ── Actualizar animación ──
+        if (personasActivas) {
+            animatorPersona.Update(deltaTime);
+        }
+
+        // ── Transición día/noche ──────────────────────────────────────
+        if (esDeNoche && factorNoche < 1.0f)
+            factorNoche = glm::min(factorNoche + velocidadTransicion * deltaTime, 1.0f);
+        else if (!esDeNoche && factorNoche > 0.0f)
+            factorNoche = glm::max(factorNoche - velocidadTransicion * deltaTime, 0.0f);
+
+        // El color de fondo también cambia (cielo)
+        float r = glm::mix(0.1f, 0.01f, factorNoche);
+        float g = glm::mix(0.1f, 0.01f, factorNoche);
+        float b = glm::mix(0.1f, 0.04f, factorNoche);
+        glClearColor(r, g, b, 1.0f);
+
+        // ── Luz direccional (sol → casi apagado de noche) ─────────────
+        float ambDia = 0.45f, ambNoche = 0.01f;
+        float difDia = 0.75f, difNoche = 0.02f;
+        float specDia = 0.25f, specNoche = 0.0f;
+
+        float amb = glm::mix(ambDia, ambNoche, factorNoche);
+        float dif = glm::mix(difDia, difNoche, factorNoche);
+        float spec = glm::mix(specDia, specNoche, factorNoche);
+
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.direction"),-0.3f, -1.0f, -0.4f);
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.ambient"),amb, amb, amb);
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.diffuse"), dif, dif, dif);
+        glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.specular"),spec, spec, spec);
+        glUniform1f(glGetUniformLocation(lightingShader.Program, "factorNoche"), factorNoche);
+
+
+        // ── Point lights (lámparas de stands) ────────────────────────
+        for (int i = 0; i < NUM_LUCES && i < 4; i++)
+        {
+            std::string base = "pointLights[" + std::to_string(i) + "]";
+
+            // Multiplica por factorNoche para que solo brillen de noche
+            glm::vec3 amb3 = lucesPuntuales[i].colorAmbiente * factorNoche;
+            glm::vec3 dif3 = lucesPuntuales[i].colorDifuso * factorNoche;
+            glm::vec3 spec3 = lucesPuntuales[i].colorEspecular * factorNoche;
+            glUniform3f(glGetUniformLocation(lightingShader.Program, (base + ".position").c_str()),
+                lucesPuntuales[i].posicion.x,
+                lucesPuntuales[i].posicion.y,
+                lucesPuntuales[i].posicion.z);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, (base + ".ambient").c_str()),
+                amb3.x, amb3.y, amb3.z);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, (base + ".diffuse").c_str()),
+                dif3.x, dif3.y, dif3.z);
+            glUniform3f(glGetUniformLocation(lightingShader.Program, (base + ".specular").c_str()),
+                spec3.x, spec3.y, spec3.z);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, (base + ".constant").c_str()), 1.0f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, (base + ".linear").c_str()), 0.001f);
+            glUniform1f(glGetUniformLocation(lightingShader.Program, (base + ".quadratic").c_str()), 0.00005f);
+        }
+
+        // Las point lights sobrantes (índices 4 a 3 del shader) quedan apagadas como antes
+        // (tu código original ya las apaga, déjalas igual)
 
         // Fondo
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -223,17 +353,11 @@ int main()
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 		//Shader animShader
-        animShader.Use();
+        /*animShader.Use();
         glUniform1i(glGetUniformLocation(animShader.Program, "Material.difuse"), 0);
         glUniform1i(glGetUniformLocation(animShader.Program, "Material.specular"), 1);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        auto& matrices = animator.finalBoneMatrices;
-        for (int i = 0; i < (int)matrices.size(); i++) {
-            string loc = "finalBonesMatrices[" + to_string(i) + "]";
-            glUniformMatrix4fv(glGetUniformLocation(animShader.Program, loc.c_str()),
-                1, GL_FALSE, glm::value_ptr(matrices[i]));
-        }
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);*/
 
         // Camera position
         GLint viewPosLoc = glGetUniformLocation(lightingShader.Program, "viewPos");
@@ -280,7 +404,7 @@ int main()
         glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.outerCutOff"), glm::cos(glm::radians(18.0f)));
 
         // Material
-        glUniform1f(glGetUniformLocation(lightingShader.Program, "material.shininess"), 5.0f);
+        glUniform1f(glGetUniformLocation(lightingShader.Program, "material_shininess"), 5.0f);
 
         //View Matrix
         glm::mat4 view = camera.GetViewMatrix();
@@ -422,71 +546,139 @@ int main()
 
         //}
 
-        /* Matriz model de la persona
-        glm::mat4 modelPersona = glm::mat4(1.0f);
-        modelPersona = glm::translate(modelPersona, glm::vec3(52.8673f, -28.0f, 112.395f));
-        modelPersona = glm::scale(modelPersona, glm::vec3(0.1f));
-        glUniformMatrix4fv(glGetUniformLocation(animShader.Program, "model"),
-            1, GL_FALSE, glm::value_ptr(modelPersona));
-        personaje.Draw(animShader);*/
-
-        // Actualizar posición aunque no sea visible aún
-        if (personaVisible)
-        {
-            // ── Lógica de movimiento por waypoints ──
-            if (waypointActual < (int)ruta.size())
-            {
-                glm::vec3 destino = ruta[waypointActual].posicion;
-                glm::vec3 direccion = destino - posPersona;
-                float distancia = glm::length(direccion);
-
-                if (distancia > 1.0f)
-                {
-                    posPersona += glm::normalize(direccion) * velocidadPersona * deltaTime;
-                    rotPersona = glm::degrees(atan2(direccion.x, direccion.z));
+        
+        //
+            for (int i = 0; i < 3; i++) {
+                // Mover hacia waypoint
+                glm::vec3 dest = rutaCompartida[agentes[i].wpActual];
+                glm::vec3 dir = dest - agentes[i].pos;
+                if (glm::length(dir) > 1.5f) {
+                    agentes[i].pos += glm::normalize(dir) * velocidadPersona * deltaTime; // fix 1
+                    agentes[i].rotY = glm::degrees(atan2(dir.x, dir.z));
                 }
-                else
-                {
-                    waypointActual++;
-                    if (waypointActual >= (int)ruta.size())
-                        waypointActual = 0;
+                else {
+                    agentes[i].wpActual = (agentes[i].wpActual + 1) % rutaCompartida.size();
                 }
+
+                // fix 2 — solo UNA declaración de t con el offset del agente
+                float t = (glfwGetTime() + agentes[i].offset) * 3.0f;
+                float anglePiernas = sin(t) * 30.0f;
+                float angleBrazos = sin(t) * 10.0f;
+
+                // TORSO
+                glm::mat4 mBase = glm::mat4(1.0f);
+                mBase = glm::translate(mBase, agentes[i].pos);  // fix 3
+                mBase = glm::rotate(mBase, glm::radians(agentes[i].rotY), glm::vec3(0, 1, 0));  // fix 3
+                mBase = glm::scale(mBase, glm::vec3(10.0f));
+                glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(mBase));
+                Torso.Draw(lightingShader);
+
+                // CABEZA
+                //glm::mat4 mCabeza = mBase;
+                //mCabeza = glm::translate(mCabeza, glm::vec3(0.0f, 0.2f, 0.0f));
+                //mCabeza = glm::translate(mCabeza, glm::vec3(0.0f, offCabezaY, 0.0f));
+                glm::mat4 mCabeza = glm::mat4(1.0f);
+                mCabeza = glm::translate(mCabeza, agentes[i].pos);
+                mCabeza = glm::rotate(mCabeza, glm::radians(agentes[i].rotY), glm::vec3(0, 1, 0));
+                mCabeza = glm::scale(mCabeza, glm::vec3(10.0f));
+                // Agrega esto — baja la cabeza hasta que pegue con el cuello:
+                mCabeza = glm::translate(mCabeza, glm::vec3(0.0f, -0.02f, 0.0f));
+                glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(mCabeza));
+                Cabeza.Draw(lightingShader);
+
+
+               // glEnable(GL_POLYGON_OFFSET_FILL);
+               // glPolygonOffset(1.0f, 1.0f);
+
+               // // PIERNA DERECHA
+               // glm::mat4 mPDer = mBase;
+               // mPDer = glm::translate(mPDer, glm::vec3(0.01f, 0.1f, 0.0f));
+               // //mPDer = glm::translate(mPDer, glm::vec3(offPiernaX, offPiernaY, 0.0f));
+               // mPDer = glm::rotate(mPDer, glm::radians(anglePiernas), glm::vec3(1, 0, 0));
+               // glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(mPDer));
+               // PiernaDer.Draw(lightingShader);
+
+               // // PIERNA IZQUIERDA
+               // glm::mat4 mPIzq = mBase;
+               // mPIzq = glm::translate(mPIzq, glm::vec3(-0.01f, 0.1f, 0.0f));
+               // //mPIzq = glm::translate(mPIzq, glm::vec3(-offPiernaX, offPiernaY, 0.0f));
+               // mPIzq = glm::rotate(mPIzq, glm::radians(-anglePiernas), glm::vec3(1, 0, 0));
+               // glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(mPIzq));
+               // PiernaIzq.Draw(lightingShader);
+
+               // glDisable(GL_POLYGON_OFFSET_FILL);
+
+               // // BRAZO DERECHO
+               // glm::mat4 mBDer = mBase;
+               //// mBDer = glm::translate(mBDer, glm::vec3(0.15f, 0.05f, 0.0f));
+               // mBDer = glm::translate(mBDer, glm::vec3(-0.01f, 0.0f, 0.0f));
+               // mBDer = glm::rotate(mBDer, glm::radians(-angleBrazos), glm::vec3(1, 0, 0));
+               // glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(mBDer));
+               // BrazoDer.Draw(lightingShader);
+
+               // // BRAZO IZQUIERDO
+               // glm::mat4 mBIzq = mBase;
+               //// mBIzq = glm::translate(mBIzq, glm::vec3(-0.15f, 0.05f, 0.0f));
+               // mBIzq = glm::translate(mBIzq, glm::vec3(0.01f, 0.0f, 0.0f));
+               // mBIzq = glm::rotate(mBIzq, glm::radians(angleBrazos), glm::vec3(1, 0, 0));
+               // glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(mBIzq));
+               // BrazoIzq.Draw(lightingShader);
+               
+                // PIERNA DERECHA — rota desde la cadera
+                glm::mat4 mPierna = glm::mat4(1.0f);
+                mPierna = glm::translate(mPierna, agentes[i].pos);
+                mPierna = glm::rotate(mPierna, glm::radians(agentes[i].rotY), glm::vec3(0, 1, 0));
+                mPierna = glm::scale(mPierna, glm::vec3(10.0f));
+                mPierna = glm::translate(mPierna, glm::vec3(0.0f, 0.08f, 0.0f));  // sube al pivot cadera
+                //mPierna = glm::rotate(mPierna, glm::radians(anglePiernas), glm::vec3(1, 0, 0)); // rota
+                mPierna = glm::translate(mPierna, glm::vec3(0.0f, -0.08f, 0.0f)); // baja de vuelta
+                glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(mPierna));
+                Pierna.Draw(lightingShader);
+
+                // PIERNA DERECHA — rota desde la cadera
+                glm::mat4 mPDer = glm::mat4(1.0f);
+                mPDer = glm::translate(mPDer, agentes[i].pos);
+                mPDer = glm::rotate(mPDer, glm::radians(agentes[i].rotY), glm::vec3(0, 1, 0));
+                mPDer = glm::scale(mPDer, glm::vec3(10.0f));
+                mPDer = glm::translate(mPDer, glm::vec3(0.0f, 0.08f, 0.0f));  // sube al pivot cadera
+                mPDer = glm::rotate(mPDer, glm::radians(anglePiernas), glm::vec3(1, 0, 0)); // rota
+                mPDer = glm::translate(mPDer, glm::vec3(0.0f, -0.08f, 0.0f)); // baja de vuelta
+                glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(mPDer));
+                PiernaDer.Draw(lightingShader);
+
+                // PIERNA IZQUIERDA — igual pero fase opuesta
+                glm::mat4 mPIzq = glm::mat4(1.0f);
+                mPIzq = glm::translate(mPIzq, agentes[i].pos);
+                mPIzq = glm::rotate(mPIzq, glm::radians(agentes[i].rotY), glm::vec3(0, 1, 0));
+                mPIzq = glm::scale(mPIzq, glm::vec3(10.0f));
+                mPIzq = glm::translate(mPIzq, glm::vec3(0.0f, 0.08f, 0.0f));  // sube al pivot
+                mPIzq = glm::rotate(mPIzq, glm::radians(-anglePiernas), glm::vec3(1, 0, 0));
+                mPIzq = glm::translate(mPIzq, glm::vec3(0.0f, -0.08f, 0.0f)); // baja
+                glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(mPIzq));
+                PiernaIzq.Draw(lightingShader);
+
+                // BRAZOS — mismo principio, pivot en el hombro
+                glm::mat4 mBDer = glm::mat4(1.0f);
+                mBDer = glm::translate(mBDer, agentes[i].pos);
+                mBDer = glm::rotate(mBDer, glm::radians(agentes[i].rotY), glm::vec3(0, 1, 0));
+                mBDer = glm::scale(mBDer, glm::vec3(10.0f));
+                mBDer = glm::translate(mBDer, glm::vec3(0.0f, 0.05f, 0.0f));  // sube al hombro
+                mBDer = glm::rotate(mBDer, glm::radians(-angleBrazos), glm::vec3(1, 0, 0));
+                mBDer = glm::translate(mBDer, glm::vec3(0.0f, -0.05f, 0.0f)); // baja
+                glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(mBDer));
+                BrazoDer.Draw(lightingShader);
+
+                glm::mat4 mBIzq = glm::mat4(1.0f);
+                mBIzq = glm::translate(mBIzq, agentes[i].pos);
+                mBIzq = glm::rotate(mBIzq, glm::radians(agentes[i].rotY), glm::vec3(0, 1, 0));
+                mBIzq = glm::scale(mBIzq, glm::vec3(10.0f));
+                mBIzq = glm::translate(mBIzq, glm::vec3(0.0f, 0.05f, 0.0f));
+                mBIzq = glm::rotate(mBIzq, glm::radians(angleBrazos), glm::vec3(1, 0, 0));
+                mBIzq = glm::translate(mBIzq, glm::vec3(0.0f, -0.05f, 0.0f));
+                glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"),1, GL_FALSE, glm::value_ptr(mBIzq));
+                BrazoIzq.Draw(lightingShader);
             }
-
-            // ── Actualizar animación ──
-            animator.Update(deltaTime);
-
-            // ── Dibujar persona ──
-            animShader.Use();
-
-            // Enviar luces (copia los mismos valores que usas en lightingShader)
-            glUniform3f(glGetUniformLocation(animShader.Program, "dirLight.direction"), -0.3f, -1.0f, -0.4f);
-            glUniform3f(glGetUniformLocation(animShader.Program, "dirLight.ambient"), 0.45f, 0.45f, 0.45f);
-            glUniform3f(glGetUniformLocation(animShader.Program, "dirLight.diffuse"), 0.75f, 0.75f, 0.75f);
-            glUniform3f(glGetUniformLocation(animShader.Program, "dirLight.specular"), 0.25f, 0.25f, 0.25f);
-            glUniform1f(glGetUniformLocation(animShader.Program, "material.shininess"), 5.0f);
-            glUniform3f(glGetUniformLocation(animShader.Program, "viewPos"),camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
-            glUniformMatrix4fv(glGetUniformLocation(animShader.Program, "view"),1, GL_FALSE, glm::value_ptr(view));
-            glUniformMatrix4fv(glGetUniformLocation(animShader.Program, "projection"),1, GL_FALSE, glm::value_ptr(projection));
-
-            // Enviar matrices de huesos
-            for (int i = 0; i < 100; i++) {
-                string loc = "finalBonesMatrices[" + to_string(i) + "]";
-                glUniformMatrix4fv(glGetUniformLocation(animShader.Program, loc.c_str()),
-                    1, GL_FALSE, glm::value_ptr(animator.finalBoneMatrices[i]));
-            }
-
-            //// Matriz del modelo
-            //glm::mat4 modelPersona = glm::mat4(1.0f);
-            //modelPersona = glm::translate(modelPersona, posPersona);
-            //modelPersona = glm::rotate(modelPersona,glm::radians(rotPersona),glm::vec3(0.0f, 1.0f, 0.0f));
-            //modelPersona = glm::scale(modelPersona, glm::vec3(0.05f)); // ajusta tamaño
-            //glUniformMatrix4fv(glGetUniformLocation(animShader.Program, "model"),1, GL_FALSE, glm::value_ptr(modelPersona));
-
-            // Textura de color y dibujar
-            glActiveTexture(GL_TEXTURE0);
-            //personaje2.Draw(animShader);
-        }
+            
 
         // ── Dibujar perro ──────────────────────────────────────────
         if (perroVisible)
@@ -685,13 +877,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     }
     if (key == GLFW_KEY_P && action == GLFW_PRESS)
     {
-        personaVisible = true;
-
-        if (!animIniciada) {
-            animator.loop = true;
-            animator.PlayAnimation(animPersona);
-            animIniciada = true;
-        }
+        personasActivas = !personasActivas;  // toggle ON/OFF
+        if (personasActivas)
+            cout << "Personas activadas" << endl;
     }
     if (key == GLFW_KEY_O && action == GLFW_PRESS)
     {
@@ -721,6 +909,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
             printf("Pajaro detenido.\n");
         }
 
+    }
+    if (key == GLFW_KEY_N && action == GLFW_PRESS)
+    {
+        esDeNoche = !esDeNoche;
+        printf(esDeNoche ? "🌙 Modo noche activado\n" : "☀️  Modo día activado\n");
     }
 }
 

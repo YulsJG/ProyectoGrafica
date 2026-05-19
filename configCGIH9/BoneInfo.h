@@ -5,6 +5,6 @@
 
 struct BoneInfo
 {
-    int       id;
+    int  id;
     glm::mat4 offsetMatrix;
 };

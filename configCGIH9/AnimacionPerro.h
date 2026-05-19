@@ -181,8 +181,6 @@ void InicializarRutaPerro()
     // Calcula tangentes suaves para toda la ruta generada
     CalcularControles(rutaPerro);
 
-    printf("Ruta perro: %d puntos generados.\n", (int)rutaPerro.size());
-
 }
 
 // ── Reset al inicio de la ruta ────────────────────────────────
