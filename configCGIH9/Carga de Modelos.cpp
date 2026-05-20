@@ -860,7 +860,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
     if (key == GLFW_KEY_N && action == GLFW_PRESS)
     {
         esDeNoche = !esDeNoche;
-        printf(esDeNoche ? "🌙 Modo noche activado\n" : "☀️  Modo día activado\n");
+        printf(esDeNoche ? "Modo noche activado\n" : "☀Modo día activado\n");
     }
     if (key == GLFW_KEY_C && action == GLFW_PRESS) {
         // Creamos una nueva cámara en la posición inicial y reemplazamos la vieja
